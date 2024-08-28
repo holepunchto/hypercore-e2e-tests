@@ -27,14 +27,21 @@ function loadConfig () {
   }
   const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
 
+  if (process.env.HYPERCORE_E2E_BYTE_LENGTH === undefined) {
+    console.error('HYPERCORE_E2E_BYTE_LENGTH must be set to the byte length of the hypercore, as a sanity check')
+    process.exit(1)
+  }
+  const coreByteLength = parseInt(process.env.HYPERCORE_E2E_BYTE_LENGTH)
+
   const config = {
     key,
     coreLength,
+    coreByteLength,
     logLevel: 'info'
   }
 
   config.prometheusServiceName = 'hypercore-e2e-tests'
-  config.prometheusAlias = `hypercore-e2e-download-${formatBytes(1000 * 100_000)}-${os.hostname()}`.replace(' ', '-')
+  config.prometheusAlias = `hypercore-e2e-download-${formatBytes(coreByteLength)}-${os.hostname()}`.replace(' ', '-')
 
   try {
     config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
@@ -50,7 +57,7 @@ function loadConfig () {
 
 async function main () {
   const config = loadConfig()
-  const { key, logLevel, coreLength } = config
+  const { key, logLevel, coreLength, coreByteLength } = config
   const {
     prometheusScraperPublicKey,
     prometheusAlias,
@@ -88,8 +95,14 @@ async function main () {
       process.exit(1)
     }
   })
-  core.on('download', () => {
+  core.on('download', async () => {
     if (core.contiguousLength === coreLength) {
+      const { byteLength } = await core.info()
+      if (byteLength !== coreByteLength) {
+        console.error(`The hypercore does not have the expected byte length of ${coreByteLength} (saw ${byteLength})`)
+        process.exit(1)
+      }
+
       logger.info('Core fully downloaded')
     }
   })

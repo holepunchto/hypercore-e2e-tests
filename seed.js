@@ -26,9 +26,16 @@ function loadConfig () {
   }
   const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
 
+  if (process.env.HYPERCORE_E2E_BYTE_LENGTH === undefined) {
+    console.error('HYPERCORE_E2E_BYTE_LENGTH must be set to the byte length of the hypercore, as a sanity check')
+    process.exit(1)
+  }
+  const coreByteLength = parseInt(process.env.HYPERCORE_E2E_BYTE_LENGTH)
+
   const config = {
     key,
     coreLength,
+    coreByteLength,
     corestoreLoc: process.env.HYPERCORE_E2E_CORESTORE_LOC || 'e2e-tests-seeder-corestore',
     logLevel: 'info'
   }
@@ -50,7 +57,7 @@ function loadConfig () {
 
 async function main () {
   const config = loadConfig()
-  const { key, corestoreLoc, logLevel, coreLength } = config
+  const { key, corestoreLoc, logLevel, coreLength, coreByteLength } = config
   const {
     prometheusScraperPublicKey,
     prometheusAlias,
@@ -60,7 +67,7 @@ async function main () {
 
   const logger = pino({ level: logLevel })
 
-  logger.info(`Starting hypercore-e2e-seeder for public key ${idEnc.normalize(key)}`)
+  logger.info(`Starting hypercore-e2e-seeder for a core of ${formatBytes(coreByteLength)} at public key ${idEnc.normalize(key)}`)
 
   const store = new Corestore(corestoreLoc)
   const swarm = new Hyperswarm()
@@ -84,8 +91,13 @@ async function main () {
       process.exit(1)
     }
   })
-  core.on('download', () => {
+  core.on('download', async () => {
     if (core.contiguousLength === coreLength) {
+      const { byteLength } = await core.info()
+      if (byteLength !== coreByteLength) {
+        console.error(`The hypercore does not have the expected byte length of ${coreByteLength} (saw ${byteLength})`)
+        process.exit(1)
+      }
       logger.info('Core fully downloaded')
     }
   })
@@ -124,6 +136,11 @@ async function main () {
   }
 
   if (core.contiguousLength === coreLength) {
+    const { byteLength } = await core.info()
+    if (byteLength !== coreByteLength) {
+      console.error(`The hypercore does not have the expected byte length of ${coreByteLength} (saw ${byteLength})`)
+      process.exit(1)
+    }
     logger.info('Core fully downloaded')
   }
 }
