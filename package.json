@@ -1,6 +1,6 @@
 {
   "name": "hypercore-e2e-tests",
-  "version": "0.0.1-alpha.0",
+  "version": "0.0.1-alpha.1",
   "description": "End-to-end tests for hypercore replication",
   "main": "index.js",
   "scripts": {
