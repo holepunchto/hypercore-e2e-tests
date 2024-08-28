@@ -6,6 +6,15 @@ Hypercore replication end-to-end tests.
 
 ### Docker
 
+#### Create
+
+docker run --network=host \
+ --mount type=volume,source=hypercore-e2e-tests-create-volume,destination=/home/hypercore-e2e-tests/corestore \
+ --env HYPERCORE_E2E_PROMETHEUS_SECRET=... \
+ --env HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY=... \
+ --env HYPERCORE_E2E_LENGTH=...(the length of the core to create) \
+  ghcr.io/holepunchto/hypercore-e2e-tests-create
+
 #### Seed
 
 ```
