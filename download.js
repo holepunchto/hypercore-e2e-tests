@@ -37,7 +37,7 @@ function loadConfig () {
     key,
     coreLength,
     coreByteLength,
-    logLevel: 'info'
+    logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info'
   }
 
   config.prometheusServiceName = 'hypercore-e2e-tests'

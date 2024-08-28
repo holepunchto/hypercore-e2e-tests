@@ -18,7 +18,7 @@ function loadConfig () {
     coreLength,
     blockSizeBytes,
     corestoreLoc: process.env.HYPERCORE_E2E_CORESTORE_LOC || 'e2e-tests-creator-corestore',
-    logLevel: 'debug'
+    logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info'
   }
 
   config.prometheusServiceName = 'hypercore-e2e-tests'
@@ -95,6 +95,7 @@ async function main () {
   }
 
   for (let i = core.length; i < coreLength; i++) {
+    if (i % 10000 === 0) logger.info(`Added block ${i}`)
     await core.append(b4a.allocUnsafe(blockSizeBytes)) // We don't really care about the block content
   }
 

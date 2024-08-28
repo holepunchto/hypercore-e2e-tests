@@ -37,11 +37,11 @@ function loadConfig () {
     coreLength,
     coreByteLength,
     corestoreLoc: process.env.HYPERCORE_E2E_CORESTORE_LOC || 'e2e-tests-seeder-corestore',
-    logLevel: 'info'
+    logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info'
   }
 
   config.prometheusServiceName = 'hypercore-e2e-tests'
-  config.prometheusAlias = `hypercore-e2e-seed-${formatBytes(1000 * 100_000)}-${os.hostname()}`.replace(' ', '-')
+  config.prometheusAlias = `hypercore-e2e-seed-${formatBytes(coreByteLength)}-${os.hostname()}`.replace(' ', '-')
 
   try {
     config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
