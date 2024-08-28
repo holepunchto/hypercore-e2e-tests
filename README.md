@@ -25,5 +25,15 @@ docker run --network=host \
  --env HYPERCORE_E2E_KEY=...(the key of the core to download) \
  --env HYPERCORE_E2E_BYTE_LENGTH=... (the byte length of the core to download) \
  --env HYPERCORE_E2E_LENGTH==... (the length of the core to download) \
- ghcr.io/holepunchto/hypercore-e2e-tests-seeder
+ ghcr.io/holepunchto/hypercore-e2e-tests-seed
 ```
+
+#### Download
+
+docker run --network=host \
+ --env HYPERCORE_E2E_PROMETHEUS_SECRET=... \
+ --env HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY=... \
+ --env HYPERCORE_E2E_KEY=... \
+ --env HYPERCORE_E2E_BYTE_LENGTH=... (the byte length of the core to download) \
+ --env HYPERCORE_E2E_LENGTH==... (the length of the core to download) \
+ ghcr.io/holepunchto/hypercore-e2e-tests-download

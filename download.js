@@ -138,6 +138,8 @@ async function main () {
     throw new Error('Logical error: did not start with a fresh storage')
   }
   core.download({ start: 0, end: -1 })
+
+  logger.info('Downloading core')
 }
 
 main()
