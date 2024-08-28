@@ -1,0 +1,4 @@
+node_modules/
+package-lock.json
+e2e-tests-creator-corestore/
+e2e-tests-seeder-corestore/
