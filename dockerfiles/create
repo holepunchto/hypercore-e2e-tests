@@ -1,0 +1,23 @@
+FROM node:20-slim
+
+# Never really a need to change this
+ENV HYPERCORE_E2E_CORESTORE_LOC=/home/hypercore-e2e-tests/corestore
+
+RUN useradd -u 8525 --create-home hypercore-e2e-tests
+
+COPY package-lock.json /home/hypercore-e2e-tests/package-lock.json
+COPY node_modules /home/hypercore-e2e-tests/node_modules
+COPY lib /home/hypercore-e2e-tests/lib
+COPY package.json /home/hypercore-e2e-tests/package.json
+COPY create.js /home/hypercore-e2e-tests/create.js
+COPY LICENSE /home/hypercore-e2e-tests/LICENSE
+COPY NOTICE /home/hypercore-e2e-tests/NOTICE
+
+USER hypercore-e2e-tests
+
+# Ensure correct permissions on corestore dir by already creating it
+# (relevant when using volumes)
+RUN mkdir $HYPERCORE_E2E_CORESTORE_LOC
+
+WORKDIR /home/hypercore-e2e-tests/
+ENTRYPOINT ["node", "/home/hypercore-e2e-tests/create.js"]
