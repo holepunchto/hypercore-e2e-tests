@@ -16,5 +16,5 @@ docker run --network=host \
  --env HYPERCORE_E2E_KEY=...(the key of the core to download) \
  --env HYPERCORE_E2E_BYTE_LENGTH=... (the byte length of the core to download) \
  --env HYPERCORE_E2E_LENGTH==... (the length of the core to download) \
- test
+ ghcr.io/holepunchto/hypercore-e2e-tests-seeder
 ```
