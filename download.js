@@ -1,11 +1,14 @@
+const os = require('os')
 const fsProm = require('fs').promises
-const { tmpdir } = require('node:os')
+const { once } = require('events')
 const path = require('path')
 const idEnc = require('hypercore-id-encoding')
 const Corestore = require('corestore')
 const Hyperswarm = require('hyperswarm')
 const pino = require('pino')
 const goodbye = require('graceful-goodbye')
+const promClient = require('prom-client')
+const formatBytes = require('tiny-byte-size')
 const instrument = require('./lib/instrument')
 
 function loadConfig () {
@@ -24,20 +27,42 @@ function loadConfig () {
   }
   const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
 
-  return {
+  const config = {
     key,
     coreLength,
     logLevel: 'info'
   }
+
+  config.prometheusServiceName = 'hypercore-e2e-tests'
+  config.prometheusAlias = `hypercore-e2e-download-${formatBytes(1000 * 100_000)}-${os.hostname()}`.replace(' ', '-')
+
+  try {
+    config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
+    config.prometheusScraperPublicKey = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY)
+  } catch (error) {
+    console.error(error)
+    console.error('HYPERCORE_E2E_PROMETHEUS_SECRET and HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY must be set to valid keys')
+    process.exit(1)
+  }
+
+  return config
 }
 
 async function main () {
-  const { key, logLevel, coreLength } = loadConfig()
+  const config = loadConfig()
+  const { key, logLevel, coreLength } = config
+  const {
+    prometheusScraperPublicKey,
+    prometheusAlias,
+    prometheusSecret,
+    prometheusServiceName
+  } = config
 
   const logger = pino({ level: logLevel })
+  logger.info(`Starting hypercore-e2e-tests downloader for public key ${idEnc.normalize(key)}`)
 
   const corestoreLoc = await fsProm.mkdtemp(
-    path.join(tmpdir(), 'hypercore-e2e-corestore-')
+    path.join(os.tmpdir(), 'hypercore-e2e-corestore-')
   )
   logger.info(`Using Corestore location ${corestoreLoc}`)
   const store = new Corestore(corestoreLoc)
@@ -47,7 +72,13 @@ async function main () {
     store.replicate(conn)
   })
 
-  instrument(logger, store, swarm)
+  const promRpcClient = instrument(logger, store, swarm, {
+    promClient,
+    prometheusScraperPublicKey,
+    prometheusAlias,
+    prometheusSecret,
+    prometheusServiceName
+  })
 
   const core = store.get({ key })
   core.on('append', () => {
@@ -66,6 +97,8 @@ async function main () {
   goodbye(async () => {
     try {
       logger.info('Shutting down')
+      await promRpcClient.close()
+      logger.info('Prom-rpc client shut down')
       await swarm.destroy()
       logger.info('swarm shut down')
       await store.close()
@@ -77,9 +110,14 @@ async function main () {
     logger.info('Successfully shut down')
   })
 
-  await core.ready()
+  // Don't start the experiment until our metrics are being scraped
+  await Promise.all([
+    promRpcClient.ready(),
+    once(promRpcClient, 'metrics-success')
+  ])
+  logger.info('Instrumentation setup')
 
-  logger.info(`Starting hypercore-e2e-tests downloader for public key ${idEnc.normalize(core.key)} (Discovery key: ${idEnc.normalize(core.discoveryKey)})`)
+  await core.ready()
 
   swarm.join(core.discoveryKey, { client: true, server: false })
 

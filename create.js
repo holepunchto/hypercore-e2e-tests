@@ -1,3 +1,5 @@
+const { once } = require('events')
+const os = require('os')
 const idEnc = require('hypercore-id-encoding')
 const Corestore = require('corestore')
 const Hyperswarm = require('hyperswarm')
@@ -6,37 +8,69 @@ const b4a = require('b4a')
 const formatBytes = require('tiny-byte-size')
 const goodbye = require('graceful-goodbye')
 const instrument = require('./lib/instrument')
+const promClient = require('prom-client')
 
 function loadConfig () {
   const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
+  const blockSizeBytes = 1000
 
-  return {
+  const config = {
     coreLength,
+    blockSizeBytes,
     corestoreLoc: process.env.HYPERCORE_E2E_CORESTORE_LOC || 'e2e-tests-creator-corestore',
-    logLevel: 'info',
-    blockSizeBytes: 1000
+    logLevel: 'debug'
   }
+
+  config.prometheusServiceName = 'hypercore-e2e-tests'
+  config.prometheusAlias = `hypercore-e2e-create-${formatBytes(coreLength * blockSizeBytes)}-${os.hostname()}`.replace(' ', '-')
+
+  try {
+    config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
+    config.prometheusScraperPublicKey = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY)
+  } catch (error) {
+    console.error(error)
+    console.error('HYPERCORE_E2E_PROMETHEUS_SECRET and HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY must be set to valid keys')
+    process.exit(1)
+  }
+
+  return config
 }
 
 async function main () {
   const config = loadConfig()
-  const { corestoreLoc, logLevel, coreLength } = config
-  const { blockSizeBytes } = config
+  const { blockSizeBytes, corestoreLoc, logLevel, coreLength } = config
+  const {
+    prometheusScraperPublicKey,
+    prometheusAlias,
+    prometheusSecret,
+    prometheusServiceName
+  } = config
+
   const logger = pino({ level: logLevel })
+
+  logger.info('Starting hypercore-e2e-tests creator')
 
   const store = new Corestore(corestoreLoc)
   const swarm = new Hyperswarm()
-  swarm.on('connection', (conn, peer) => {
+  swarm.on('connection', (conn) => {
     store.replicate(conn)
   })
 
-  instrument(logger, store, swarm)
+  const promRpcClient = instrument(logger, store, swarm, {
+    promClient,
+    prometheusScraperPublicKey,
+    prometheusAlias,
+    prometheusSecret,
+    prometheusServiceName
+  })
 
   const core = store.get({ name: `e2e-test-core-${coreLength}-${blockSizeBytes}` })
 
   goodbye(async () => {
     try {
       logger.info('Shutting down')
+      await promRpcClient.close()
+      logger.info('Prom-rpc client shut down')
       await swarm.destroy()
       logger.info('swarm shut down')
       await store.close()
@@ -47,9 +81,14 @@ async function main () {
     logger.info('Successfully shut down')
   })
 
-  await core.ready()
+  // Don't start the experiment until our metrics are being scraped
+  await Promise.all([
+    promRpcClient.ready(),
+    once(promRpcClient, 'metrics-success')
+  ])
+  logger.info('Instrumentation setup')
 
-  logger.info('Starting hypercore-e2e-tests creator')
+  await core.ready()
 
   if (core.length === coreLength) {
     logger.info('Found existing core')
