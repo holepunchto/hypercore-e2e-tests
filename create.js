@@ -22,8 +22,7 @@ function loadConfig () {
   }
 
   config.prometheusServiceName = 'hypercore-e2e-tests'
-  config.prometheusAlias = `hypercore-e2e-create-${formatBytes(coreLength * blockSizeBytes)}-${os.hostname()}`.replace(' ', '-')
-
+  config.prometheusAlias = process.env.HYPERCORE_E2E_PROMETHEUS_ALIAS || `hypercore-e2e-create-${formatBytes(coreLength * blockSizeBytes)}-${os.hostname()}`.replace(' ', '-')
   try {
     config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
     config.prometheusScraperPublicKey = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY)
