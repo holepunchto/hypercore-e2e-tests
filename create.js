@@ -12,7 +12,7 @@ const promClient = require('prom-client')
 
 function loadConfig () {
   const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
-  const blockSizeBytes = 1000
+  const blockSizeBytes = parseInt(process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES)
 
   const config = {
     coreLength,
