@@ -9,6 +9,7 @@ const formatBytes = require('tiny-byte-size')
 const goodbye = require('graceful-goodbye')
 const instrument = require('./lib/instrument')
 const promClient = require('prom-client')
+const replSwarm = require('repl-swarm')
 
 function loadConfig () {
   const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
@@ -18,7 +19,8 @@ function loadConfig () {
     coreLength,
     blockSizeBytes,
     corestoreLoc: process.env.HYPERCORE_E2E_CORESTORE_LOC || 'e2e-tests-creator-corestore',
-    logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info'
+    logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info',
+    exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true'
   }
 
   config.prometheusServiceName = 'hypercore-e2e-tests'
@@ -37,7 +39,7 @@ function loadConfig () {
 
 async function main () {
   const config = loadConfig()
-  const { blockSizeBytes, corestoreLoc, logLevel, coreLength } = config
+  const { blockSizeBytes, corestoreLoc, logLevel, coreLength, exposeRepl } = config
   const {
     prometheusScraperPublicKey,
     prometheusAlias,
@@ -65,6 +67,10 @@ async function main () {
 
   const core = store.get({ name: `e2e-test-core-${coreLength}-${blockSizeBytes}` })
 
+  if (exposeRepl === true) {
+    const replKey = replSwarm({ core, store, swarm, promRpcClient})
+    logger.warn(`Exposed repl swarm at key ${replKey} (core, store, swarm and promRpcClient)`)
+  }
   goodbye(async () => {
     try {
       logger.info('Shutting down')

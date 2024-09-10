@@ -9,6 +9,7 @@ const pino = require('pino')
 const goodbye = require('graceful-goodbye')
 const promClient = require('prom-client')
 const formatBytes = require('tiny-byte-size')
+const replSwarm = require('repl-swarm')
 const instrument = require('./lib/instrument')
 
 function loadConfig () {
@@ -37,7 +38,8 @@ function loadConfig () {
     key,
     coreLength,
     coreByteLength,
-    logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info'
+    logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info',
+    exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true'
   }
 
   config.prometheusServiceName = 'hypercore-e2e-tests'
@@ -62,7 +64,8 @@ async function main () {
     prometheusScraperPublicKey,
     prometheusAlias,
     prometheusSecret,
-    prometheusServiceName
+    prometheusServiceName,
+    exposeRepl
   } = config
 
   const logger = pino({ level: logLevel })
@@ -106,6 +109,11 @@ async function main () {
       logger.info('Core fully downloaded')
     }
   })
+
+  if (exposeRepl === true) {
+    const replKey = replSwarm({ core, store, swarm, promRpcClient})
+    logger.warn(`Exposed repl swarm at key ${replKey} (core, store, swarm and promRpcClient)`)
+  }
 
   goodbye(async () => {
     try {
