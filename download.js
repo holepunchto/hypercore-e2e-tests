@@ -111,7 +111,7 @@ async function main () {
   })
 
   if (exposeRepl === true) {
-    const replKey = replSwarm({ core, store, swarm, promRpcClient})
+    const replKey = replSwarm({ core, store, swarm, promRpcClient })
     logger.warn(`Exposed repl swarm at key ${replKey} (core, store, swarm and promRpcClient)`)
   }
 
