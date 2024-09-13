@@ -30,7 +30,7 @@
     "hypercore-stats": "^1.1.0",
     "hyperdht": "^6.16.3",
     "hyperswarm": "^4.8.2",
-    "hyperswarm-stats": "^1.1.0",
+    "hyperswarm-stats": "holepunchto/hyperswarm-stats",
     "pino": "^9.3.2",
     "prom-client": "^15.1.3",
     "repl-swarm": "^2.1.0",
