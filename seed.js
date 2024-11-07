@@ -71,7 +71,14 @@ async function main () {
 
   const store = new Corestore(corestoreLoc)
   const swarm = new Hyperswarm()
-  swarm.on('connection', (conn, peer) => {
+  let nrConnections = 0
+  swarm.on('connection', (conn) => {
+    nrConnections++
+    logger.info(`Connected to peer (total ${nrConnections})`)
+    conn.on('close', () => {
+      nrConnections--
+      logger.info(`Disconnected from peer (total ${nrConnections})`)
+    })
     store.replicate(conn)
   })
 
