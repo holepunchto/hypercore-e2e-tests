@@ -6,6 +6,11 @@
   "scripts": {
     "test": "standard"
   },
+  "bin": {
+    "hypercore-e2e-create": "./create.js",
+    "hypercore-e2e-seed": "./seed.js",
+    "hypercore-e2e-download": "./download.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/holepunchto/hypercore-e2e-tests.git"

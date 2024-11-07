@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 const os = require('os')
 const fsProm = require('fs').promises
 const { once } = require('events')
@@ -28,30 +30,34 @@ function loadConfig () {
   }
   const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
 
-  if (process.env.HYPERCORE_E2E_BYTE_LENGTH === undefined) {
-    console.error('HYPERCORE_E2E_BYTE_LENGTH must be set to the byte length of the hypercore, as a sanity check')
+  if (process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES === undefined) {
+    console.error('HYPERCORE_E2E_BLOCK_SIZE_BYTES must be set, as a sanity check')
     process.exit(1)
   }
-  const coreByteLength = parseInt(process.env.HYPERCORE_E2E_BYTE_LENGTH)
+  const blockSizeBytes = parseInt(process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES)
+  const coreByteLength = coreLength * blockSizeBytes
 
   const config = {
     key,
     coreLength,
+    blockSizeBytes,
     coreByteLength,
     logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info',
     exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true'
   }
 
-  config.prometheusServiceName = 'hypercore-e2e-tests'
-  config.prometheusAlias = process.env.HYPERCORE_E2E_PROMETHEUS_ALIAS || `hypercore-e2e-download-${formatBytes(coreByteLength)}-${os.hostname()}`.replace(' ', '-')
+  if (process.env.HYPERCORE_E2E_PROMETHEUS_SECRET) {
+    config.prometheusServiceName = 'hypercore-e2e-tests'
+    config.prometheusAlias = process.env.HYPERCORE_E2E_PROMETHEUS_ALIAS || `hypercore-e2e-download-${formatBytes(coreByteLength)}-${os.hostname()}`.replace(' ', '-')
 
-  try {
-    config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
-    config.prometheusScraperPublicKey = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY)
-  } catch (error) {
-    console.error(error)
-    console.error('HYPERCORE_E2E_PROMETHEUS_SECRET and HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY must be set to valid keys')
-    process.exit(1)
+    try {
+      config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
+      config.prometheusScraperPublicKey = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY)
+    } catch (error) {
+      console.error(error)
+      console.error('HYPERCORE_E2E_PROMETHEUS_SECRET and HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY must be set to valid keys')
+      process.exit(1)
+    }
   }
 
   return config
@@ -59,17 +65,11 @@ function loadConfig () {
 
 async function main () {
   const config = loadConfig()
-  const { key, logLevel, coreLength, coreByteLength } = config
-  const {
-    prometheusScraperPublicKey,
-    prometheusAlias,
-    prometheusSecret,
-    prometheusServiceName,
-    exposeRepl
-  } = config
+  const { exposeRepl, key, logLevel, coreLength, coreByteLength, blockSizeBytes } = config
 
   const logger = pino({ level: logLevel })
   logger.info(`Starting hypercore-e2e-tests downloader for public key ${idEnc.normalize(key)}`)
+  logger.info(`The hypercore contains ${coreLength} blocks of ${formatBytes(blockSizeBytes)} (total ${formatBytes(coreByteLength)})`)
 
   const corestoreLoc = await fsProm.mkdtemp(
     path.join(os.tmpdir(), 'hypercore-e2e-corestore-')
@@ -82,13 +82,23 @@ async function main () {
     store.replicate(conn)
   })
 
-  const promRpcClient = instrument(logger, store, swarm, {
-    promClient,
-    prometheusScraperPublicKey,
-    prometheusAlias,
-    prometheusSecret,
-    prometheusServiceName
-  })
+  let promRpcClient
+  if (config.prometheusAlias) {
+    const {
+      prometheusScraperPublicKey,
+      prometheusAlias,
+      prometheusSecret,
+      prometheusServiceName
+    } = config
+
+    promRpcClient = instrument(logger, store, swarm, {
+      promClient,
+      prometheusScraperPublicKey,
+      prometheusAlias,
+      prometheusSecret,
+      prometheusServiceName
+    })
+  }
 
   const core = store.get({ key })
   core.on('append', () => {
@@ -118,8 +128,10 @@ async function main () {
   goodbye(async () => {
     try {
       logger.info('Shutting down')
-      await promRpcClient.close()
-      logger.info('Prom-rpc client shut down')
+      if (promRpcClient) {
+        await promRpcClient.close()
+        logger.info('Prom-rpc client shut down')
+      }
       await swarm.destroy()
       logger.info('swarm shut down')
       await store.close()
@@ -131,12 +143,14 @@ async function main () {
     logger.info('Successfully shut down')
   })
 
-  // Don't start the experiment until our metrics are being scraped
-  await Promise.all([
-    promRpcClient.ready(),
-    once(promRpcClient, 'metrics-success')
-  ])
-  logger.info('Instrumentation setup')
+  if (promRpcClient) {
+    // Don't start the experiment until our metrics are being scraped
+    await Promise.all([
+      promRpcClient.ready(),
+      once(promRpcClient, 'metrics-success')
+    ])
+    logger.info('Instrumentation setup')
+  }
 
   await core.ready()
 
