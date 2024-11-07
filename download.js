@@ -43,7 +43,8 @@ function loadConfig () {
     blockSizeBytes,
     coreByteLength,
     logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info',
-    exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true'
+    exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true',
+    downloadLogInterval: process.env.HYPERCORE_E2E_DOWNLOAD_LOG_INTERVAL || 1000
   }
 
   if (process.env.HYPERCORE_E2E_PROMETHEUS_SECRET) {
@@ -65,7 +66,7 @@ function loadConfig () {
 
 async function main () {
   const config = loadConfig()
-  const { exposeRepl, key, logLevel, coreLength, coreByteLength, blockSizeBytes } = config
+  const { exposeRepl, key, logLevel, coreLength, coreByteLength, blockSizeBytes, downloadLogInterval } = config
 
   const logger = pino({ level: logLevel })
   logger.info(`Starting hypercore-e2e-tests downloader for public key ${idEnc.normalize(key)}`)
@@ -78,7 +79,14 @@ async function main () {
   const store = new Corestore(corestoreLoc)
 
   const swarm = new Hyperswarm()
+  let nrConnections = 0
   swarm.on('connection', (conn) => {
+    nrConnections++
+    console.info(`Connected to peer (total ${nrConnections})`)
+    conn.on('close', () => {
+      nrConnections--
+      logger.info(`Disconnected from peer (total ${nrConnections})`)
+    })
     store.replicate(conn)
   })
 
@@ -108,7 +116,14 @@ async function main () {
       process.exit(1)
     }
   })
+
+  let nrBlocksDownloaded = 0
   core.on('download', async () => {
+    nrBlocksDownloaded++
+    if (nrBlocksDownloaded % downloadLogInterval === 0) {
+      logger.info(getProgressInfo(nrBlocksDownloaded, blockSizeBytes, startTime))
+    }
+
     if (core.contiguousLength === coreLength) {
       const { byteLength } = await core.info()
       if (byteLength !== coreByteLength) {
@@ -116,7 +131,8 @@ async function main () {
         process.exit(1)
       }
 
-      logger.info('Core fully downloaded')
+      logger.info(getProgressInfo(nrBlocksDownloaded, blockSizeBytes, startTime))
+      logger.info(`Core fully downloaded in ${getRuntime(startTime)}`)
     }
   })
 
@@ -153,6 +169,7 @@ async function main () {
   }
 
   await core.ready()
+  const startTime = Date.now()
 
   swarm.join(core.discoveryKey, { client: true, server: false })
 
@@ -162,6 +179,28 @@ async function main () {
   core.download({ start: 0, end: -1 })
 
   logger.info('Downloading core')
+}
+
+function getRuntime (start) {
+  const msTot = Date.now() - start
+  const ms = msTot % 1000
+  const secTotal = Math.floor(msTot / 1000)
+  const min = Math.floor(secTotal / 60)
+  const sec = secTotal % 60
+
+  let res = ''
+  if (min > 0) res += `${min}m `
+  return res + `${sec}.${ms}s`
+}
+
+function getSpeed (start, bytesDownloaded) {
+  const msTot = Date.now() - start
+  const bytesPerSec = 1000 * bytesDownloaded / msTot
+  return `${formatBytes(bytesPerSec)} / sec`
+}
+
+function getProgressInfo (nrBlocksDownloaded, blockSizeBytes, startTime) {
+  return `Downloaded block ${nrBlocksDownloaded} (time: ${getRuntime(startTime)} at ${getSpeed(startTime, nrBlocksDownloaded * blockSizeBytes)})`
 }
 
 main()
