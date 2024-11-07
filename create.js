@@ -14,8 +14,8 @@ const promClient = require('prom-client')
 const replSwarm = require('repl-swarm')
 
 function loadConfig () {
-  const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
-  const blockSizeBytes = parseInt(process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES)
+  const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH || 15250)
+  const blockSizeBytes = parseInt(process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES || 65536)
 
   const config = {
     coreLength,

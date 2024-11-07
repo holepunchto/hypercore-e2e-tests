@@ -22,17 +22,8 @@ function loadConfig () {
     process.exit(1)
   }
 
-  if (process.env.HYPERCORE_E2E_LENGTH === undefined) {
-    console.error('HYPERCORE_E2E_LENGTH must be set to the length of the hypercore, as a sanity check')
-    process.exit(1)
-  }
-  const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH)
-
-  if (process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES === undefined) {
-    console.error('HYPERCORE_E2E_BLOCK_SIZE_BYTES must be set, as a sanity check')
-    process.exit(1)
-  }
-  const blockSizeBytes = parseInt(process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES)
+  const coreLength = parseInt(process.env.HYPERCORE_E2E_LENGTH || 15250)
+  const blockSizeBytes = parseInt(process.env.HYPERCORE_E2E_BLOCK_SIZE_BYTES || 65536)
   const coreByteLength = coreLength * blockSizeBytes
 
   const config = {
@@ -112,7 +103,7 @@ async function main () {
     if (core.contiguousLength === coreLength) {
       const { byteLength } = await core.info()
       if (byteLength !== coreByteLength) {
-        console.error(`The hypercore does not have the expected byte length of ${coreByteLength} (saw ${byteLength})`)
+        logger.error(`The hypercore does not have the expected byte length of ${coreByteLength} (saw ${byteLength})`)
         process.exit(1)
       }
       logger.info('Core fully downloaded')
@@ -159,7 +150,7 @@ async function main () {
   if (core.contiguousLength === coreLength) {
     const { byteLength } = await core.info()
     if (byteLength !== coreByteLength) {
-      console.error(`The hypercore does not have the expected byte length of ${coreByteLength} (saw ${byteLength})`)
+      logger.error(`The hypercore does not have the expected byte length of ${coreByteLength} (saw ${byteLength})`)
       process.exit(1)
     }
     logger.info('Core fully downloaded')
