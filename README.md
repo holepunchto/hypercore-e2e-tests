@@ -13,19 +13,19 @@ npm i -g hypercore-e2e-tests pino-pretty
 #### Create
 
 ```
-HYPERCORE_E2E_LENGTH=15250 HYPERCORE_E2E_BLOCK_SIZE_BYTES=65536 hypercore-e2e-create | pino-pretty
+hypercore-e2e-create | pino-pretty
 ```
 
 #### Seed
 
 ```
-HYPERCORE_E2E_KEY=<public key printed by create process> HYPERCORE_E2E_LENGTH=15250 HYPERCORE_E2E_BLOCK_SIZE_BYTES=65536 hypercore-e2e-seed | pino-pretty
+HYPERCORE_E2E_KEY=<public key printed by create process> hypercore-e2e-seed | pino-pretty
 ```
 
 #### Download
 
 ```
-HYPERCORE_E2E_KEY=<public key printed by create process> HYPERCORE_E2E_LENGTH=15250 HYPERCORE_E2E_BLOCK_SIZE_BYTES=65536 hypercore-e2e-download | pino-pretty
+HYPERCORE_E2E_KEY=<public key printed by create process> hypercore-e2e-download | pino-pretty
 ```
 
 ### Docker
@@ -51,8 +51,7 @@ docker run --network=host \
  --env HYPERCORE_E2E_PROMETHEUS_SECRET=... \
  --env HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY=... \
  --env HYPERCORE_E2E_KEY=...(the key of the core to download) \
- --env HYPERCORE_E2E_BYTE_LENGTH=... (the byte length of the core to download) \
- --env HYPERCORE_E2E_LENGTH==... (the length of the core to download) \
+ --env HYPERCORE_E2E_LENGTH=... (the length of the core to download) \
  ghcr.io/holepunchto/hypercore-e2e-tests-seed
 ```
 
@@ -63,7 +62,6 @@ docker run --network=host \
  --env HYPERCORE_E2E_PROMETHEUS_SECRET=... \
  --env HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY=... \
  --env HYPERCORE_E2E_KEY=... \
- --env HYPERCORE_E2E_BYTE_LENGTH=... (the byte length of the core to download) \
- --env HYPERCORE_E2E_LENGTH==... (the length of the core to download) \
+ --env HYPERCORE_E2E_LENGTH=... (the length of the core to download) \
  ghcr.io/holepunchto/hypercore-e2e-tests-download
 ```
