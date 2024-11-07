@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 const { once } = require('events')
 const os = require('os')
 const idEnc = require('hypercore-id-encoding')
@@ -23,15 +25,18 @@ function loadConfig () {
     exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true'
   }
 
-  config.prometheusServiceName = 'hypercore-e2e-tests'
-  config.prometheusAlias = process.env.HYPERCORE_E2E_PROMETHEUS_ALIAS || `hypercore-e2e-create-${formatBytes(coreLength * blockSizeBytes)}-${os.hostname()}`.replace(' ', '-')
-  try {
-    config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
-    config.prometheusScraperPublicKey = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY)
-  } catch (error) {
-    console.error(error)
-    console.error('HYPERCORE_E2E_PROMETHEUS_SECRET and HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY must be set to valid keys')
-    process.exit(1)
+  if (process.env.HYPERCORE_E2E_PROMETHEUS_SECRET) {
+    config.prometheusServiceName = 'hypercore-e2e-tests'
+    config.prometheusAlias = process.env.HYPERCORE_E2E_PROMETHEUS_ALIAS || `hypercore-e2e-create-${formatBytes(coreLength * blockSizeBytes)}-${os.hostname()}`.replace(' ', '-')
+
+    try {
+      config.prometheusSecret = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SECRET)
+      config.prometheusScraperPublicKey = idEnc.decode(process.env.HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY)
+    } catch (error) {
+      console.error(error)
+      console.error('HYPERCORE_E2E_PROMETHEUS_SECRET and HYPERCORE_E2E_PROMETHEUS_SCRAPER_PUBLIC_KEY must be set to valid keys')
+      process.exit(1)
+    }
   }
 
   return config
@@ -40,12 +45,6 @@ function loadConfig () {
 async function main () {
   const config = loadConfig()
   const { blockSizeBytes, corestoreLoc, logLevel, coreLength, exposeRepl } = config
-  const {
-    prometheusScraperPublicKey,
-    prometheusAlias,
-    prometheusSecret,
-    prometheusServiceName
-  } = config
 
   const logger = pino({ level: logLevel })
 
@@ -57,13 +56,24 @@ async function main () {
     store.replicate(conn)
   })
 
-  const promRpcClient = instrument(logger, store, swarm, {
-    promClient,
-    prometheusScraperPublicKey,
-    prometheusAlias,
-    prometheusSecret,
-    prometheusServiceName
-  })
+  let promRpcClient = null
+  if (config.prometheusAlias) {
+    logger.info('Instrumenting')
+    const {
+      prometheusScraperPublicKey,
+      prometheusAlias,
+      prometheusSecret,
+      prometheusServiceName
+    } = config
+
+    promRpcClient = instrument(logger, store, swarm, {
+      promClient,
+      prometheusScraperPublicKey,
+      prometheusAlias,
+      prometheusSecret,
+      prometheusServiceName
+    })
+  }
 
   const core = store.get({ name: `e2e-test-core-${coreLength}-${blockSizeBytes}` })
 
@@ -71,11 +81,16 @@ async function main () {
     const replKey = replSwarm({ core, store, swarm, promRpcClient })
     logger.warn(`Exposed repl swarm at key ${replKey} (core, store, swarm and promRpcClient)`)
   }
+
+  let closing = false
   goodbye(async () => {
+    closing = true
     try {
       logger.info('Shutting down')
-      await promRpcClient.close()
-      logger.info('Prom-rpc client shut down')
+      if (promRpcClient) {
+        await promRpcClient.close()
+        logger.info('Prom-rpc client shut down')
+      }
       await swarm.destroy()
       logger.info('swarm shut down')
       await store.close()
@@ -86,12 +101,14 @@ async function main () {
     logger.info('Successfully shut down')
   })
 
-  // Don't start the experiment until our metrics are being scraped
-  await Promise.all([
-    promRpcClient.ready(),
-    once(promRpcClient, 'metrics-success')
-  ])
-  logger.info('Instrumentation setup')
+  if (promRpcClient) {
+    // Don't start the experiment until our metrics are being scraped
+    await Promise.all([
+      promRpcClient.ready(),
+      once(promRpcClient, 'metrics-success')
+    ])
+    logger.info('Instrumentation setup')
+  }
 
   await core.ready()
 
@@ -100,6 +117,7 @@ async function main () {
   }
 
   for (let i = core.length; i < coreLength; i++) {
+    if (closing) return
     if (i % 10000 === 0) logger.info(`Added block ${i}`)
     await core.append(b4a.allocUnsafe(blockSizeBytes)) // We don't really care about the block content
   }

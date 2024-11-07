@@ -4,7 +4,33 @@ Hypercore replication end-to-end tests.
 
 ## Run
 
+### CLI
+
+```
+npm i -g hypercore-e2e-tests pino-pretty
+```
+
+#### Create
+
+```
+HYPERCORE_E2E_LENGTH=15250 HYPERCORE_E2E_BLOCK_SIZE_BYTES=65536 hypercore-e2e-create | pino-pretty
+```
+
+#### Seed
+
+```
+HYPERCORE_E2E_KEY=<public key printed by create process> HYPERCORE_E2E_LENGTH=15250 HYPERCORE_E2E_BLOCK_SIZE_BYTES=65536 hypercore-e2e-seed | pino-pretty
+```
+
+#### Download
+
+```
+HYPERCORE_E2E_KEY=<public key printed by create process> HYPERCORE_E2E_LENGTH=15250 HYPERCORE_E2E_BLOCK_SIZE_BYTES=65536 hypercore-e2e-download | pino-pretty
+```
+
 ### Docker
+
+Note: the `PROMETHEUS_*` environment variables are optional. If set, the process will connect to the specified dht-prometheus scraper before starting the experiment.
 
 #### Create
 
