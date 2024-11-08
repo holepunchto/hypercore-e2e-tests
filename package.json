@@ -2,7 +2,7 @@
   "name": "hypercore-e2e-tests",
   "version": "0.0.1-alpha.17",
   "description": "End-to-end tests for hypercore replication",
-  "main": "index.js",
+  "main": "create.js",
   "scripts": {
     "test": "standard"
   },
@@ -11,6 +11,12 @@
     "hypercore-e2e-seed": "./seed.js",
     "hypercore-e2e-download": "./download.js"
   },
+  "files": [
+    "create.js",
+    "seed.js",
+    "download.js",
+    "lib/**"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/holepunchto/hypercore-e2e-tests.git"
