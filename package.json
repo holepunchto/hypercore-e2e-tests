@@ -7,9 +7,9 @@
     "test": "standard"
   },
   "bin": {
-    "hypercore-e2e-create": "./create.js",
-    "hypercore-e2e-seed": "./seed.js",
-    "hypercore-e2e-download": "./download.js"
+    "hypercore-e2e-create": "create.js",
+    "hypercore-e2e-seed": "seed.js",
+    "hypercore-e2e-download": "download.js"
   },
   "files": [
     "create.js",
