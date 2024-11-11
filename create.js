@@ -22,7 +22,8 @@ function loadConfig () {
     blockSizeBytes,
     corestoreLoc: process.env.HYPERCORE_E2E_CORESTORE_LOC || 'e2e-tests-creator-corestore',
     logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info',
-    exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true'
+    exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true',
+    timeoutSec: process.env.HYPERCORE_E2E_TIMEOUT_SEC || null
   }
 
   if (process.env.HYPERCORE_E2E_PROMETHEUS_SECRET) {
@@ -44,11 +45,19 @@ function loadConfig () {
 
 async function main () {
   const config = loadConfig()
-  const { blockSizeBytes, corestoreLoc, logLevel, coreLength, exposeRepl } = config
+  const { timeoutSec, blockSizeBytes, corestoreLoc, logLevel, coreLength, exposeRepl } = config
 
   const logger = pino({ level: logLevel })
 
   logger.info('Starting hypercore-e2e-tests creator')
+
+  if (timeoutSec) {
+    logger.info(`Process will shut down after ${timeoutSec} seconds`)
+    setTimeout(() => {
+      logger.info('Process timeout limit reached')
+      goodbye.exit()
+    }, timeoutSec * 1000)
+  }
 
   const store = new Corestore(corestoreLoc)
   const swarm = new Hyperswarm()
