@@ -34,7 +34,8 @@ function loadConfig () {
     coreByteLength,
     logLevel: process.env.HYPERCORE_E2E_LOG_LEVEL || 'info',
     exposeRepl: process.env.HYPERCORE_E2E_REPL === 'true',
-    downloadLogInterval: process.env.HYPERCORE_E2E_DOWNLOAD_LOG_INTERVAL || 1000
+    downloadLogInterval: process.env.HYPERCORE_E2E_DOWNLOAD_LOG_INTERVAL || 1000,
+    timeoutSec: process.env.HYPERCORE_E2E_TIMEOUT_SEC || null
   }
 
   if (process.env.HYPERCORE_E2E_PROMETHEUS_SECRET) {
@@ -56,11 +57,19 @@ function loadConfig () {
 
 async function main () {
   const config = loadConfig()
-  const { exposeRepl, key, logLevel, coreLength, coreByteLength, blockSizeBytes, downloadLogInterval } = config
+  const { timeoutSec, exposeRepl, key, logLevel, coreLength, coreByteLength, blockSizeBytes, downloadLogInterval } = config
 
   const logger = pino({ level: logLevel })
   logger.info(`Starting hypercore-e2e-tests downloader for public key ${idEnc.normalize(key)}`)
   logger.info(`The hypercore contains ${coreLength} blocks of ${formatBytes(blockSizeBytes)} (total ${formatBytes(coreByteLength)})`)
+
+  if (timeoutSec) {
+    logger.info(`Process will shut down after ${timeoutSec} seconds`)
+    setTimeout(() => {
+      logger.info('Process timeout limit reached')
+      goodbye.exit()
+    }, timeoutSec * 1000)
+  }
 
   const corestoreLoc = await fsProm.mkdtemp(
     path.join(os.tmpdir(), 'hypercore-e2e-corestore-')
